@@ -1,9 +1,11 @@
+import csv
 import pygame
 import sys
 
 from pygame.rect import Rect
 from pygame.sprite import AbstractGroup, Group, Sprite
 from pygame.surface import Surface
+from random import randint
 from typing import *
 
 
@@ -54,6 +56,7 @@ class Square(Sprite):
             self.image: pygame.Surface = font.render(f'', True, font_color)
 
     def init_value(self, value: int) -> None:
+        value = int(value)
         if value and (1 <= value <= 9):
             self.value = value
             self.locked = True
@@ -185,7 +188,12 @@ class SudokuWrapper:
             return False
         return True
 
-    def init(self, values: list[int]) -> None:
+    def init(self) -> None:
+        with open('data.csv', newline='') as csvfile:
+            csv_reader = csv.reader(csvfile)
+            rows = [row for row in csv_reader]
+            row = rows[randint(0, 999)]
+            values = row[0]
         for value, square in zip(values, self.squares):
             square.init_value(value)
 
@@ -197,19 +205,7 @@ clock = pygame.time.Clock()
 font = pygame.font.Font(None, 100)
 
 sudoku = SudokuWrapper()
-sudoku.init(
-    [
-        1,2,3,4,5,6,7,8,9,
-        0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,
-    ]
-)
+sudoku.init()
 
 while True:
     for event in pygame.event.get():
