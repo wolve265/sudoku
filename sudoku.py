@@ -21,8 +21,9 @@ class Square(Sprite):
         self.selected: bool = False
         self.locked: bool = False
         self.value: int = 0
-        self.image: pygame.Surface = font.render(f'', True, 'Black')
-        self.rect = pygame.Rect((self.row*SQUARE_LEN, self.col*SQUARE_LEN), (SQUARE_LEN, SQUARE_LEN))
+        self.image: pygame.Surface = font.render(f'0', True, 'Black')
+        self.bg_rect = pygame.Rect((self.row*SQUARE_LEN, self.col*SQUARE_LEN), (SQUARE_LEN, SQUARE_LEN))
+        self.rect = self.image.get_rect(center=self.bg_rect.center)
 
     def __repr__(self) -> str:
         return f'{super().__repr__()} | pos = ({self.row},{self.col})'
@@ -35,7 +36,7 @@ class Square(Sprite):
             fill_color = 'cadetblue1'
         elif self.hoovered or self.locked:
             fill_color = 'Gray90'
-        pygame.draw.rect(surface, fill_color, self.rect)
+        pygame.draw.rect(surface, fill_color, self.bg_rect)
 
     def update(self, *args: Any, **kwargs: Any) -> None:
         self.update_hoovered()
@@ -44,7 +45,7 @@ class Square(Sprite):
 
     def update_hoovered(self) -> None:
         mouse_pos = pygame.mouse.get_pos()
-        self.hoovered = self.rect.collidepoint(mouse_pos)
+        self.hoovered = self.bg_rect.collidepoint(mouse_pos)
 
     def update_image(self) -> None:
         font_color = 'Gray20'
@@ -124,13 +125,13 @@ class BigSquare(Group):
 class Sudoku(Group):
     def __init__(self, *sprites: Union[Sprite, Sequence[Sprite]]) -> None:
         super().__init__(*sprites)
-        self.rect = pygame.Rect((0, 0), (9*SQUARE_LEN, 9*SQUARE_LEN))
+        self.bg_rect = pygame.Rect((0, 0), (9*SQUARE_LEN, 9*SQUARE_LEN))
 
     def draw_border(self, surface: Surface) -> None:
-        pygame.draw.line(surface, 'Black', self.rect.topleft, self.rect.topright, 6)
-        pygame.draw.line(surface, 'Black', self.rect.topleft, self.rect.bottomleft, 6)
-        pygame.draw.line(surface, 'Black', self.rect.bottomleft, self.rect.bottomright, 10)
-        pygame.draw.line(surface, 'Black', self.rect.topright, self.rect.bottomright, 10)
+        pygame.draw.line(surface, 'Black', self.bg_rect.topleft, self.bg_rect.topright, 6)
+        pygame.draw.line(surface, 'Black', self.bg_rect.topleft, self.bg_rect.bottomleft, 6)
+        pygame.draw.line(surface, 'Black', self.bg_rect.bottomleft, self.bg_rect.bottomright, 10)
+        pygame.draw.line(surface, 'Black', self.bg_rect.topright, self.bg_rect.bottomright, 10)
 
     def draw(self, surface: Surface) -> List[Rect]:
         for square in self.sprites():
