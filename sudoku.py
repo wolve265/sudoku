@@ -2,6 +2,7 @@ import csv
 import pygame
 import sys
 
+from enum import Enum, auto
 from pygame.rect import Rect
 from pygame.sprite import AbstractGroup, Group, Sprite
 from pygame.surface import Surface
@@ -9,7 +10,69 @@ from random import randint
 from typing import *
 
 
-SQUARE_LEN = 80
+SCALE = 10
+
+
+class State(Enum):
+    START_SCREEN = auto()
+    GAME = auto()
+    END_SCREEN = auto()
+
+
+class StartButton(Sprite):
+    def __init__(self, *groups: AbstractGroup) -> None:
+        super().__init__(*groups)
+        self.image: pygame.Surface = font.render(f'Start Game', True, 'Black', 'Gray60')
+        self.rect = self.image.get_rect(center=screen.get_rect().center)
+
+
+class StartScreen(Group):
+    def __init__(self) -> None:
+        self.button = StartButton()
+        super().__init__(self.button)
+
+    def draw(self, surface: Surface) -> List[Rect]:
+        screen.fill('White')
+        return super().draw(surface)
+
+    def actions(self, event: pygame.event.Event) -> None:
+        global state
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == pygame.BUTTON_LEFT:
+            if self.button.rect.collidepoint(event.pos):
+                state = State.GAME
+                game.init()
+
+
+class RestartButton(Sprite):
+    def __init__(self, *groups: AbstractGroup) -> None:
+        super().__init__(*groups)
+        self.image: pygame.Surface = font.render(f'Restart Game', True, 'Black', 'Gray60')
+        self.rect = self.image.get_rect(center=screen.get_rect().center)
+
+
+class CongratulationsText(Sprite):
+    def __init__(self, *groups: AbstractGroup) -> None:
+        super().__init__(*groups)
+        self.image: pygame.Surface = font.render(f'Congratulations', True, 'Black', 'Gray60')
+        self.rect = self.image.get_rect(centerx=screen.get_rect().centerx, top=0)
+
+
+class EndScreen(Group):
+    def __init__(self) -> None:
+        self.button = RestartButton()
+        self.congratulations = CongratulationsText()
+        super().__init__(self.button, self.congratulations)
+
+    def draw(self, surface: Surface) -> List[Rect]:
+        screen.fill('White')
+        return super().draw(surface)
+
+    def actions(self, event: pygame.event.Event) -> None:
+        global state
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == pygame.BUTTON_LEFT:
+            if self.button.rect.collidepoint(event.pos):
+                state = State.GAME
+                game.init()
 
 
 class Square(Sprite):
@@ -57,6 +120,11 @@ class Square(Sprite):
             self.image: pygame.Surface = font.render(f'', True, font_color)
 
     def init_value(self, value: int) -> None:
+        self.value = 0
+        self.hoovered = False
+        self.selected = False
+        self.locked = False
+
         value = int(value)
         if value and (1 <= value <= 9):
             self.value = value
@@ -140,7 +208,7 @@ class Sudoku(Group):
         return super().draw(surface)
 
 
-class SudokuWrapper:
+class Game:
     def __init__(self) -> None:
         self.sudoku: Sudoku = Sudoku()
         self.rows: list[Row] = []
@@ -155,12 +223,42 @@ class SudokuWrapper:
             for y in range(9):
                 self.squares.append(Square(self.rows[y], self.cols[x], self.big_squares[int(x/3)+int(y/3)*3], self.sudoku))
 
-    def draw(self) -> None:
-        self.sudoku.draw(screen)
+    def draw(self, surface: Surface) -> None:
+        self.sudoku.draw(surface)
         for row in self.rows:
-            row.draw(screen)
+            row.draw(surface)
         for col in self.cols:
-            col.draw(screen)
+            col.draw(surface)
+
+    def actions(self, event: pygame.event.Event) -> None:
+        global state
+        if self.end():
+            state = State.END_SCREEN
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == pygame.BUTTON_LEFT:
+                selected_square = self.get_selected_square()
+                pressed_square = self.get_collide_square(event.pos)
+                if pressed_square and selected_square == pressed_square:
+                    pressed_square.deselect()
+                else:
+                    if selected_square:
+                        selected_square.deselect()
+                    if pressed_square:
+                        pressed_square.select()
+            elif event.button == pygame.BUTTON_RIGHT:
+                if (square := self.get_selected_square()):
+                    square.deselect()
+        elif event.type == pygame.KEYDOWN:
+            if (pygame.K_1 <= event.key <= pygame.K_9) and (square := self.get_selected_square()):
+                value = int(chr(event.key))
+                if self.value_valid(value):
+                    square.set_value(value)
+                square.deselect()
+            elif event.key == pygame.K_DELETE and (square := self.get_selected_square()):
+                square.clear_value()
+                square.deselect()
+            elif event.key == pygame.K_r:
+                game.init()
 
     def update(self) -> None:
         self.sudoku.update()
@@ -198,46 +296,48 @@ class SudokuWrapper:
         for value, square in zip(values, self.squares):
             square.init_value(value)
 
+    def end(self) -> bool:
+        for square in self.squares:
+            if not square.value:
+                return False
+        return True
 
+SQUARE_LEN = 8*SCALE
 pygame.init()
 pygame.display.set_caption('Sudoku')
-screen = pygame.display.set_mode((9*SQUARE_LEN, 9*SQUARE_LEN))
+if pygame.display.Info().current_h > 9*SQUARE_LEN:
+    screen = pygame.display.set_mode((9*SQUARE_LEN, 9*SQUARE_LEN))
+else:
+    raise pygame.error('Window is too large')
 clock = pygame.time.Clock()
-font = pygame.font.Font(None, 100)
+font = pygame.font.Font(None, 10*SCALE)
 
-sudoku = SudokuWrapper()
-sudoku.init()
+state = State.START_SCREEN
+start_screen = StartScreen()
+game = Game()
+end_screen = EndScreen()
 
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == pygame.BUTTON_LEFT:
-            selected_square = sudoku.get_selected_square()
-            pressed_square = sudoku.get_collide_square(event.pos)
-            if pressed_square and selected_square == pressed_square:
-                pressed_square.deselect()
-            else:
-                if selected_square:
-                    selected_square.deselect()
-                if pressed_square:
-                    pressed_square.select()
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == pygame.BUTTON_RIGHT:
-            if (square := sudoku.get_selected_square()):
-                square.deselect()
-        elif event.type == pygame.KEYDOWN:
-            if (pygame.K_1 <= event.key <= pygame.K_9) and (square := sudoku.get_selected_square()):
-                value = int(chr(event.key))
-                if sudoku.value_valid(value):
-                    square.set_value(value)
-                square.deselect()
-            elif event.key == pygame.K_DELETE and (square := sudoku.get_selected_square()):
-                square.clear_value()
-                square.deselect()
+        elif state == State.START_SCREEN:
+            start_screen.actions(event)
+        elif state == State.GAME:
+            game.actions(event)
+        elif state == State.END_SCREEN:
+            end_screen.actions(event)
 
-    sudoku.update()
-    sudoku.draw()
+    if state == State.START_SCREEN:
+        start_screen.update()
+        start_screen.draw(screen)
+    elif state == State.GAME:
+        game.update()
+        game.draw(screen)
+    elif state == State.END_SCREEN:
+        end_screen.update()
+        end_screen.draw(screen)
 
     pygame.display.update()
     clock.tick(60)
