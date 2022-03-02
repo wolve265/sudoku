@@ -1,8 +1,9 @@
 import csv
+import os
 import pygame
-import sys
 
-from enum import Enum, auto
+from game import game
+
 from pygame.rect import Rect
 from pygame.sprite import AbstractGroup, Group, Sprite
 from pygame.surface import Surface
@@ -10,20 +11,11 @@ from random import randint
 from typing import *
 
 
-SCALE = 10
-
-
-class State(Enum):
-    START_SCREEN = auto()
-    GAME = auto()
-    END_SCREEN = auto()
-
-
 class StartButton(Sprite):
     def __init__(self, *groups: AbstractGroup) -> None:
         super().__init__(*groups)
-        self.image: pygame.Surface = font.render(f'Start Game', True, 'Black', 'Gray60')
-        self.rect = self.image.get_rect(center=screen.get_rect().center)
+        self.image: pygame.Surface = game.font.render(f'Start Sudoku', True, 'Black', 'Gray60')
+        self.rect = self.image.get_rect(center=game.screen.get_rect().center)
 
 
 class StartScreen(Group):
@@ -32,29 +24,27 @@ class StartScreen(Group):
         super().__init__(self.button)
 
     def draw(self, surface: Surface) -> List[Rect]:
-        screen.fill('White')
+        game.screen.fill('White')
         return super().draw(surface)
 
     def actions(self, event: pygame.event.Event) -> None:
-        global state
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == pygame.BUTTON_LEFT:
             if self.button.rect.collidepoint(event.pos):
-                state = State.GAME
-                game.init()
+                game.new()
 
 
 class RestartButton(Sprite):
     def __init__(self, *groups: AbstractGroup) -> None:
         super().__init__(*groups)
-        self.image: pygame.Surface = font.render(f'Restart Game', True, 'Black', 'Gray60')
-        self.rect = self.image.get_rect(center=screen.get_rect().center)
+        self.image: pygame.Surface = game.font.render(f'Restart Sudoku', True, 'Black', 'Gray60')
+        self.rect = self.image.get_rect(center=game.screen.get_rect().center)
 
 
 class CongratulationsText(Sprite):
     def __init__(self, *groups: AbstractGroup) -> None:
         super().__init__(*groups)
-        self.image: pygame.Surface = font.render(f'Congratulations', True, 'Black', 'Gray60')
-        self.rect = self.image.get_rect(centerx=screen.get_rect().centerx, top=0)
+        self.image: pygame.Surface = game.font.render(f'Congratulations', True, 'Black', 'Gray60')
+        self.rect = self.image.get_rect(centerx=game.screen.get_rect().centerx, top=0)
 
 
 class EndScreen(Group):
@@ -64,15 +54,13 @@ class EndScreen(Group):
         super().__init__(self.button, self.congratulations)
 
     def draw(self, surface: Surface) -> List[Rect]:
-        screen.fill('White')
+        game.screen.fill('White')
         return super().draw(surface)
 
     def actions(self, event: pygame.event.Event) -> None:
-        global state
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == pygame.BUTTON_LEFT:
             if self.button.rect.collidepoint(event.pos):
-                state = State.GAME
-                game.init()
+                game.new()
 
 
 class Square(Sprite):
@@ -84,9 +72,9 @@ class Square(Sprite):
         self.selected: bool = False
         self.locked: bool = False
         self.value: int = 0
-        self.image: pygame.Surface = font.render(f'0', True, 'Black')
-        self.bg_rect = pygame.Rect((self.row*SQUARE_LEN, self.col*SQUARE_LEN), (SQUARE_LEN, SQUARE_LEN))
-        self.rect = self.image.get_rect(center=self.bg_rect.center)
+        self.image: pygame.Surface = game.font.render(f'0', True, 'Black')
+        self.full_rect = pygame.Rect((self.row*game.square_len, self.col*game.square_len), (game.square_len, game.square_len))
+        self.rect = self.image.get_rect(center=self.full_rect.center)
 
     def __repr__(self) -> str:
         return f'{super().__repr__()} | pos = ({self.row},{self.col})'
@@ -99,7 +87,7 @@ class Square(Sprite):
             fill_color = 'cadetblue1'
         elif self.hoovered or self.locked:
             fill_color = 'Gray90'
-        pygame.draw.rect(surface, fill_color, self.bg_rect)
+        pygame.draw.rect(surface, fill_color, self.full_rect)
 
     def update(self, *args: Any, **kwargs: Any) -> None:
         self.update_hoovered()
@@ -108,16 +96,16 @@ class Square(Sprite):
 
     def update_hoovered(self) -> None:
         mouse_pos = pygame.mouse.get_pos()
-        self.hoovered = self.bg_rect.collidepoint(mouse_pos)
+        self.hoovered = self.full_rect.collidepoint(mouse_pos)
 
     def update_image(self) -> None:
         font_color = 'Gray20'
         if self.locked:
             font_color = 'Black'
         if self.value and (1 <= self.value <= 9):
-            self.image: pygame.Surface = font.render(f'{self.value}', True, font_color)
+            self.image: pygame.Surface = game.font.render(f'{self.value}', True, font_color)
         else:
-            self.image: pygame.Surface = font.render(f'', True, font_color)
+            self.image: pygame.Surface = game.font.render(f'', True, font_color)
 
     def init_value(self, value: int) -> None:
         self.value = 0
@@ -161,9 +149,9 @@ class Row(Group):
 
     def draw(self, surface: Surface) -> None:
         if self.id % 3 == 0:
-            pygame.draw.line(surface, 'Black', (0, self.id*SQUARE_LEN), (9*SQUARE_LEN, self.id*SQUARE_LEN), 2)
+            pygame.draw.line(surface, 'Black', (0, self.id*game.square_len), (9*game.square_len, self.id*game.square_len), 2)
         else:
-            pygame.draw.line(surface, 'Black', (0, self.id*SQUARE_LEN), (9*SQUARE_LEN, self.id*SQUARE_LEN), 1)
+            pygame.draw.line(surface, 'Black', (0, self.id*game.square_len), (9*game.square_len, self.id*game.square_len), 1)
 
 
 class Col(Group):
@@ -176,9 +164,9 @@ class Col(Group):
 
     def draw(self, surface: Surface) -> None:
         if self.id % 3 == 0:
-            pygame.draw.line(surface, 'Black', (self.id*SQUARE_LEN, 0), (self.id*SQUARE_LEN, 9*SQUARE_LEN), 2)
+            pygame.draw.line(surface, 'Black', (self.id*game.square_len, 0), (self.id*game.square_len, 9*game.square_len), 2)
         else:
-            pygame.draw.line(surface, 'Black', (self.id*SQUARE_LEN, 0), (self.id*SQUARE_LEN, 9*SQUARE_LEN), 1)
+            pygame.draw.line(surface, 'Black', (self.id*game.square_len, 0), (self.id*game.square_len, 9*game.square_len), 1)
 
 
 class BigSquare(Group):
@@ -190,16 +178,16 @@ class BigSquare(Group):
         return f'{super().__repr__()} = {self.id}'
 
 
-class Sudoku(Group):
+class SudokuGroup(Group):
     def __init__(self, *sprites: Union[Sprite, Sequence[Sprite]]) -> None:
         super().__init__(*sprites)
-        self.bg_rect = pygame.Rect((0, 0), (9*SQUARE_LEN, 9*SQUARE_LEN))
+        self.full_rect = pygame.Rect((0, 0), (9*game.square_len, 9*game.square_len))
 
     def draw_border(self, surface: Surface) -> None:
-        pygame.draw.line(surface, 'Black', self.bg_rect.topleft, self.bg_rect.topright, 6)
-        pygame.draw.line(surface, 'Black', self.bg_rect.topleft, self.bg_rect.bottomleft, 6)
-        pygame.draw.line(surface, 'Black', self.bg_rect.bottomleft, self.bg_rect.bottomright, 10)
-        pygame.draw.line(surface, 'Black', self.bg_rect.topright, self.bg_rect.bottomright, 10)
+        pygame.draw.line(surface, 'Black', self.full_rect.topleft, self.full_rect.topright, 6)
+        pygame.draw.line(surface, 'Black', self.full_rect.topleft, self.full_rect.bottomleft, 6)
+        pygame.draw.line(surface, 'Black', self.full_rect.bottomleft, self.full_rect.bottomright, 10)
+        pygame.draw.line(surface, 'Black', self.full_rect.topright, self.full_rect.bottomright, 10)
 
     def draw(self, surface: Surface) -> List[Rect]:
         for square in self.sprites():
@@ -208,9 +196,9 @@ class Sudoku(Group):
         return super().draw(surface)
 
 
-class Game:
+class Sudoku:
     def __init__(self) -> None:
-        self.sudoku: Sudoku = Sudoku()
+        self.sudoku: SudokuGroup = SudokuGroup()
         self.rows: list[Row] = []
         self.cols: list[Col] = []
         self.big_squares: list[BigSquare] = []
@@ -231,9 +219,8 @@ class Game:
             col.draw(surface)
 
     def actions(self, event: pygame.event.Event) -> None:
-        global state
-        if self.end():
-            state = State.END_SCREEN
+        if self.is_end():
+            game.end()
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == pygame.BUTTON_LEFT:
                 selected_square = self.get_selected_square()
@@ -258,14 +245,14 @@ class Game:
                 square.clear_value()
                 square.deselect()
             elif event.key == pygame.K_r:
-                game.init()
+                game.new()
 
     def update(self) -> None:
         self.sudoku.update()
 
     def get_collide_square(self, pos: tuple[int]) -> Square | None:
         for square in self.squares:
-            if square.rect.collidepoint(pos):
+            if square.full_rect.collidepoint(pos):
                 return square
         return None
 
@@ -279,7 +266,7 @@ class Game:
         selected_square = self.get_selected_square()
         forbidden_values = set()
         for group in selected_square.groups():
-            if type(group) == Sudoku:
+            if type(group) == SudokuGroup:
                 continue
             for sprite in group.sprites():
                 forbidden_values.add(sprite.value)
@@ -288,7 +275,7 @@ class Game:
         return True
 
     def init(self) -> None:
-        with open('data.csv', newline='') as csvfile:
+        with open(os.path.join('data', 'data.csv'), newline='') as csvfile:
             csv_reader = csv.reader(csvfile)
             rows = [row for row in csv_reader]
             row = rows[randint(0, 999)]
@@ -296,48 +283,8 @@ class Game:
         for value, square in zip(values, self.squares):
             square.init_value(value)
 
-    def end(self) -> bool:
+    def is_end(self) -> bool:
         for square in self.squares:
             if not square.value:
                 return False
         return True
-
-SQUARE_LEN = 8*SCALE
-pygame.init()
-pygame.display.set_caption('Sudoku')
-if pygame.display.Info().current_h > 9*SQUARE_LEN:
-    screen = pygame.display.set_mode((9*SQUARE_LEN, 9*SQUARE_LEN))
-else:
-    raise pygame.error('Window is too large')
-clock = pygame.time.Clock()
-font = pygame.font.Font(None, 10*SCALE)
-
-state = State.START_SCREEN
-start_screen = StartScreen()
-game = Game()
-end_screen = EndScreen()
-
-while True:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-        elif state == State.START_SCREEN:
-            start_screen.actions(event)
-        elif state == State.GAME:
-            game.actions(event)
-        elif state == State.END_SCREEN:
-            end_screen.actions(event)
-
-    if state == State.START_SCREEN:
-        start_screen.update()
-        start_screen.draw(screen)
-    elif state == State.GAME:
-        game.update()
-        game.draw(screen)
-    elif state == State.END_SCREEN:
-        end_screen.update()
-        end_screen.draw(screen)
-
-    pygame.display.update()
-    clock.tick(60)
