@@ -2,7 +2,7 @@ import pygame
 
 from game import game, GameState
 
-from sudoku import StartScreen, Sudoku, EndScreen
+from sudoku_test import StartScreen, Sudoku, EndScreen
 
 
 class App:
